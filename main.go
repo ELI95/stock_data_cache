@@ -25,7 +25,7 @@ func main() {
 
 	cron.RunCrontabJob()
 
-	addr := "localhost:7295"
+	addr := "0.0.0.0:7295"
 	peers := cache.NewHTTPPool(addr)
 	log.Println("server is running at", addr)
 	log.Fatal(http.ListenAndServe(addr, peers))
