@@ -2,6 +2,7 @@ package cache
 
 import (
 	"container/list"
+	"fmt"
 	"time"
 )
 
@@ -75,8 +76,15 @@ func (c *Cache) Len() int {
 
 // Get look ups a key's value
 func (c *Cache) Get(key string) (value Value, ok bool) {
-	if ele, ok := c.cache[key]; ok && time.Now().Sub(ele.Value.(*entry).timestamp).Minutes() < 15 {
+	if ele, ok := c.cache[key]; ok {
 		c.ll.MoveToFront(ele)
+		if int(time.Now().Sub(ele.Value.(*entry).timestamp).Minutes()) >= ExpireMinutes {
+			fmt.Printf("cache timeout, key: %s\n", key)
+			go func() {
+				g := GetGroup(Sina)
+				g.UpdateCache(10, ExpireMinutes)
+			}()
+		}
 		return ele.Value.(*entry).value, true
 	}
 	return

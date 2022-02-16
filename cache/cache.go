@@ -10,6 +10,7 @@ import (
 )
 
 const FilePath = "/tmp/cache.gob"
+const ExpireMinutes = 15
 
 // A ByteView holds an immutable view of bytes.
 type ByteView struct {
@@ -158,7 +159,7 @@ func (g *Group) populateCache(key string, value ByteView) {
 	g.mainCache.add(key, value)
 }
 
-func (g *Group) UpdateCache(num int) {
+func (g *Group) UpdateCache(num, minutes int) {
 	defer utils.TimeTrack(time.Now(), "UpdateCache")
 
 	keys := make([]string, 0)
@@ -174,7 +175,10 @@ func (g *Group) UpdateCache(num int) {
 			break
 		}
 		kv := ele.Value.(*entry)
-		keys = append(keys, kv.key)
+		// Only update caches that have timed out
+		if int(time.Now().Sub(kv.timestamp).Minutes()) >= minutes {
+			keys = append(keys, kv.key)
+		}
 		if ele == g.mainCache.lru.ll.Back() {
 			break
 		}
@@ -186,8 +190,8 @@ func (g *Group) UpdateCache(num int) {
 	g.mainCache.mu.Unlock()
 
 	var succeed int
-	kvs := make(map[string]string)
 	for _, key := range keys {
+		time.Sleep(time.Millisecond * 100)
 		v, err := RequestSina(key)
 		if err != nil {
 			fmt.Printf("request sina failed, err: %s\n", err.Error())
@@ -195,19 +199,37 @@ func (g *Group) UpdateCache(num int) {
 		}
 		value := ByteView{b: cloneBytes([]byte(v))}
 		g.mainCache.add(key, value)
-		kvs[key] = v
 		succeed++
 	}
 	fmt.Printf("update cache done, total: %d, succeed: %d\n", len(keys), succeed)
-
-	g.SaveCache(kvs)
 }
 
-func (g *Group) SaveCache(kvs map[string]string) {
+func (g *Group) SaveCache() {
+	kvs := make(map[string]string)
+
+	g.mainCache.mu.Lock()
+	if g.mainCache.lru == nil {
+		g.mainCache.lru = New(g.mainCache.cacheBytes, nil)
+	}
+
+	ele := g.mainCache.lru.ll.Front()
+	for {
+		if ele == nil {
+			break
+		}
+		kvs[ele.Value.(*entry).key] = string(ele.Value.(*entry).value.(ByteView).ByteSlice())
+		if ele == g.mainCache.lru.ll.Back() {
+			break
+		}
+		ele = ele.Next()
+	}
+	g.mainCache.mu.Unlock()
+
 	if err := utils.Save(FilePath, kvs); err != nil {
 		fmt.Printf("save cache failed, error: %s\n", err.Error())
+		return
 	}
-	fmt.Println("save cache done")
+	fmt.Printf("save cache done, key number: %d\n", len(kvs))
 }
 
 func (g *Group) LoadCache() {
@@ -226,5 +248,5 @@ func (g *Group) LoadCache() {
 		g.mainCache.add(k, ByteView{b: cloneBytes([]byte(v))})
 	}
 
-	fmt.Println("load cache done")
+	fmt.Printf("load cache done, key number: %d\n", len(kvs))
 }
