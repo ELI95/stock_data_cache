@@ -164,6 +164,10 @@ func (g *Group) UpdateCache(num int) {
 	keys := make([]string, 0)
 
 	g.mainCache.mu.Lock()
+	if g.mainCache.lru == nil {
+		g.mainCache.lru = New(g.mainCache.cacheBytes, nil)
+	}
+
 	ele := g.mainCache.lru.ll.Front()
 	for {
 		if ele == nil {

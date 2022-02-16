@@ -20,6 +20,7 @@ func main() {
 		}))
 	g := cache.GetGroup(cache.Sina)
 	g.LoadCache()
+	g.UpdateCache(1000)
 
 	cron.RunCrontabJob()
 
