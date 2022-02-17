@@ -32,6 +32,10 @@ func (p *HTTPPool) Log(format string, v ...interface{}) {
 
 // ServeHTTP handle all http requests
 func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, UPDATE")
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
+
 	// /<basepath>/<groupname>?key=...
 	if !strings.HasPrefix(r.URL.Path, p.basePath) {
 		http.Error(w, "unexpected path: "+r.URL.Path, http.StatusNotFound)
