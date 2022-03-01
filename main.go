@@ -20,9 +20,6 @@ func main() {
 		}))
 	g := cache.GetGroup(cache.Sina)
 	g.LoadCache()
-	g.UpdateCache(1000, 0)
-	g.SaveCache()
-
 	cron.RunCrontabJob()
 
 	addr := "0.0.0.0:7295"

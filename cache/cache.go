@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
+const UpdateCacheApi = "http://api.gushenpai.com:7295/cache/sina?key=%s&value=%s"
 const FilePath = "/tmp/cache.gob"
-const ExpireMinutes = 15
+const ExpireMinutes = 60
 
 // A ByteView holds an immutable view of bytes.
 type ByteView struct {
@@ -145,14 +146,15 @@ func (g *Group) load(key string) (value ByteView, err error) {
 	return
 }
 
-func (g *Group) getLocally(key string) (ByteView, error) {
+func (g *Group) getLocally(key string) (value ByteView, err error) {
 	bytes, err := g.getter.Get(key)
 	if err != nil {
-		return ByteView{}, err
+		value = ByteView{}
+	} else {
+		value = ByteView{b: cloneBytes(bytes)}
 	}
-	value := ByteView{b: cloneBytes(bytes)}
 	g.populateCache(key, value)
-	return value, nil
+	return value, err
 }
 
 func (g *Group) populateCache(key string, value ByteView) {
@@ -194,7 +196,7 @@ func (g *Group) UpdateCache(num, minutes int) {
 		time.Sleep(time.Millisecond * 100)
 		v, err := RequestSina(key)
 		if err != nil {
-			fmt.Printf("request sina failed, err: %s\n", err.Error())
+			fmt.Printf("request sina failed, error: %s\n", err.Error())
 			continue
 		}
 		value := ByteView{b: cloneBytes([]byte(v))}
@@ -249,4 +251,27 @@ func (g *Group) LoadCache() {
 	}
 
 	fmt.Printf("load cache done, key number: %d\n", len(kvs))
+}
+
+func (g *Group) RemoteUpdateCache() {
+	g.LoadCache()
+	g.UpdateCache(g.mainCache.lru.ll.Len(), 0)
+
+	g.mainCache.mu.Lock()
+	defer g.mainCache.mu.Unlock()
+	ele := g.mainCache.lru.ll.Front()
+	for {
+		if ele == nil {
+			break
+		}
+
+		kv := ele.Value.(*entry)
+		api := fmt.Sprintf(UpdateCacheApi, kv.key, kv.value.(ByteView).b)
+		_, _ = DoGetRequest(api)
+
+		if ele == g.mainCache.lru.ll.Back() {
+			break
+		}
+		ele = ele.Next()
+	}
 }

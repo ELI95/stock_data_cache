@@ -4,6 +4,8 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"errors"
+	"fmt"
 	"github.com/axgle/mahonia"
 	"io"
 	"io/ioutil"
@@ -48,6 +50,11 @@ func RequestSina(url string) (data string, err error) {
 		return
 	}
 
+	if resp.StatusCode != 200 {
+		err = errors.New(fmt.Sprintf("status code: %d", resp.StatusCode))
+		return
+	}
+
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
 	}(resp.Body)
@@ -58,5 +65,45 @@ func RequestSina(url string) (data string, err error) {
 		return
 	}
 	data = mahonia.NewDecoder("gbk").ConvertString(string(body))
+	return
+}
+
+func DoGetRequest(url string) (data string, err error) {
+	defer utils.TimeTrack(time.Now(), "DoGetRequest")
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+
+	// fix EOF error
+	// it prevents the connection from being re-used
+	// see https://stackoverflow.com/questions/17714494/golang-http-request-results-in-eof-errors-when-making-multiple-requests-successi/23963271
+	req.Close = true
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	req.WithContext(ctx)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+
+	if resp.StatusCode != 200 {
+		err = errors.New(fmt.Sprintf("status code: %d", resp.StatusCode))
+		return
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	data = string(body)
 	return
 }

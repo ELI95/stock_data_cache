@@ -61,6 +61,13 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if values, ok := r.URL.Query()["value"]; ok {
+		// update cache
+		value := values[0]
+		group.populateCache(key, ByteView{b: cloneBytes([]byte(value))})
+	}
+
+	// get cache
 	view, err := group.Get(key)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
