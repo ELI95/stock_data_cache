@@ -1,11 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"stock_data_cache/cache"
-	"stock_data_cache/cron"
+	"time"
 )
 
 func main() {
@@ -14,13 +15,30 @@ func main() {
 			log.Println("request sina", key)
 			v, err := cache.RequestSina(key)
 			if err != nil {
-				return nil, fmt.Errorf("request sina failed, err: %s", err.Error())
+				msg := fmt.Sprintf("request sina failed, error: %s", err.Error())
+				fmt.Println(msg)
+				return nil, errors.New(msg)
 			}
 			return []byte(v), nil
 		}))
 	g := cache.GetGroup(cache.Sina)
 	g.LoadCache()
-	cron.RunCrontabJob()
+	go func() {
+		for {
+			select {
+			case <- time.After(time.Hour):
+				g.SaveCache()
+			}
+		}
+	}()
+	go func() {
+		for {
+			empty, _ := g.RemoteUpdateCache()
+			if empty {
+				<- time.After(time.Minute)
+			}
+		}
+	}()
 
 	addr := "0.0.0.0:7295"
 	peers := cache.NewHTTPPool(addr)

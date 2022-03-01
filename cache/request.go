@@ -107,3 +107,25 @@ func DoGetRequest(url string) (data string, err error) {
 	data = string(body)
 	return
 }
+
+func DoPostRequest(url string, body io.Reader) (*http.Response, error) {
+	defer utils.TimeTrack(time.Now(), "DoPostRequest")
+
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	// fix EOF error
+	// it prevents the connection from being re-used
+	// see https://stackoverflow.com/questions/17714494/golang-http-request-results-in-eof-errors-when-making-multiple-requests-successi/23963271
+	req.Close = true
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req.WithContext(ctx)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}

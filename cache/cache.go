@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"golang.org/x/sync/singleflight"
 	"os"
@@ -9,9 +11,11 @@ import (
 	"time"
 )
 
-const UpdateCacheApi = "http://api.gushenpai.com:7295/cache/sina?key=%s&value=%s"
+const MissedChanLen = 1000
+const MissedCacheApi = "http://api.gushenpai.com:7295/cache/sina?missed=1"
+const UpdateCacheApi = "http://api.gushenpai.com:7295/cache/sina"
 const FilePath = "/tmp/cache.gob"
-const ExpireMinutes = 60
+const ExpireMinutes = 30
 
 // A ByteView holds an immutable view of bytes.
 type ByteView struct {
@@ -42,6 +46,7 @@ func cloneBytes(b []byte) []byte {
 type cache struct {
 	mu         sync.Mutex
 	lru        *Cache
+	missedChan chan string
 	cacheBytes int64
 }
 
@@ -146,15 +151,21 @@ func (g *Group) load(key string) (value ByteView, err error) {
 	return
 }
 
-func (g *Group) getLocally(key string) (value ByteView, err error) {
+func (g *Group) getLocally(key string) (ByteView, error) {
 	bytes, err := g.getter.Get(key)
 	if err != nil {
-		value = ByteView{}
-	} else {
-		value = ByteView{b: cloneBytes(bytes)}
+		if g.mainCache.missedChan == nil {
+			g.mainCache.missedChan = make(chan string, MissedChanLen)
+		}
+		select {
+		case g.mainCache.missedChan <- key:
+		default:
+		}
+		return ByteView{}, err
 	}
+	value := ByteView{b: cloneBytes(bytes)}
 	g.populateCache(key, value)
-	return value, err
+	return value, nil
 }
 
 func (g *Group) populateCache(key string, value ByteView) {
@@ -253,25 +264,32 @@ func (g *Group) LoadCache() {
 	fmt.Printf("load cache done, key number: %d\n", len(kvs))
 }
 
-func (g *Group) RemoteUpdateCache() {
-	g.LoadCache()
-	g.UpdateCache(g.mainCache.lru.ll.Len(), 0)
-
-	g.mainCache.mu.Lock()
-	defer g.mainCache.mu.Unlock()
-	ele := g.mainCache.lru.ll.Front()
-	for {
-		if ele == nil {
-			break
-		}
-
-		kv := ele.Value.(*entry)
-		api := fmt.Sprintf(UpdateCacheApi, kv.key, kv.value.(ByteView).b)
-		_, _ = DoGetRequest(api)
-
-		if ele == g.mainCache.lru.ll.Back() {
-			break
-		}
-		ele = ele.Next()
+func (g *Group) RemoteUpdateCache() (empty bool, err error) {
+	key, err := DoGetRequest(MissedCacheApi)
+	if err != nil {
+		fmt.Printf("request get missed failed, error: %s\n", err.Error())
+		return
 	}
+	if key == "" {
+		fmt.Println("no missed")
+		empty = true
+		return
+	}
+
+	value, err := RequestSina(key)
+	if err != nil {
+		fmt.Printf("request sina failed, error: %s\n", err.Error())
+		return
+	}
+
+	req := UpdateCacheRequest{
+		Key:   key,
+		Value: value,
+	}
+	b, _ := json.Marshal(req)
+	if _, err = DoPostRequest(UpdateCacheApi, bytes.NewBuffer(b)); err != nil {
+		fmt.Printf("request update cache failed, error: %s\n", err.Error())
+	}
+	fmt.Printf("request update cache succeed, key: %s, value: %s\n", key, value)
+	return
 }
