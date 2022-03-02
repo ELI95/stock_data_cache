@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/sync/singleflight"
 	"os"
@@ -152,20 +153,29 @@ func (g *Group) load(key string) (value ByteView, err error) {
 }
 
 func (g *Group) getLocally(key string) (ByteView, error) {
-	b, err := g.getter.Get(key)
-	if err != nil {
-		if g.mainCache.missedChan == nil {
-			g.mainCache.missedChan = make(chan string, MissedChanLen)
-		}
-		select {
-		case g.mainCache.missedChan <- key:
-		default:
-		}
-		return ByteView{}, err
+	//b, err := g.getter.Get(key)
+	//if err != nil {
+	//	if g.mainCache.missedChan == nil {
+	//		g.mainCache.missedChan = make(chan string, MissedChanLen)
+	//	}
+	//	select {
+	//	case g.mainCache.missedChan <- key:
+	//	default:
+	//	}
+	//	return ByteView{}, err
+	//}
+	//value := ByteView{b: cloneBytes(b)}
+	//g.populateCache(key, value)
+	//return value, nil
+
+	if g.mainCache.missedChan == nil {
+		g.mainCache.missedChan = make(chan string, MissedChanLen)
 	}
-	value := ByteView{b: cloneBytes(b)}
-	g.populateCache(key, value)
-	return value, nil
+	select {
+	case g.mainCache.missedChan <- key:
+	default:
+	}
+	return ByteView{}, errors.New("no data")
 }
 
 func (g *Group) populateCache(key string, value ByteView) {
