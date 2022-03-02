@@ -33,12 +33,21 @@ func main() {
 	}()
 	go func() {
 		for {
-			empty, _ := g.RemoteUpdateCache()
-			if empty {
-				<- time.After(time.Minute)
+			select {
+			case <- time.After(time.Minute * 10):
+				g.SendTimeoutCache(100)
 			}
 		}
 	}()
+	//go func() {
+	//	for {
+	//		<- time.After(time.Second)
+	//		empty, _ := g.RemoteUpdateCache()
+	//		if empty {
+	//			<- time.After(time.Second * 10)
+	//		}
+	//	}
+	//}()
 
 	addr := "0.0.0.0:7295"
 	peers := cache.NewHTTPPool(addr)

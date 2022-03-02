@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const MissedChanLen = 1000
+const MissedChanLen = 5000
 const MissedCacheApi = "http://api.gushenpai.com:7295/cache/sina?missed=1"
 const UpdateCacheApi = "http://api.gushenpai.com:7295/cache/sina"
 const FilePath = "/tmp/cache.gob"
@@ -152,7 +152,7 @@ func (g *Group) load(key string) (value ByteView, err error) {
 }
 
 func (g *Group) getLocally(key string) (ByteView, error) {
-	bytes, err := g.getter.Get(key)
+	b, err := g.getter.Get(key)
 	if err != nil {
 		if g.mainCache.missedChan == nil {
 			g.mainCache.missedChan = make(chan string, MissedChanLen)
@@ -163,7 +163,7 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 		}
 		return ByteView{}, err
 	}
-	value := ByteView{b: cloneBytes(bytes)}
+	value := ByteView{b: cloneBytes(b)}
 	g.populateCache(key, value)
 	return value, nil
 }
@@ -292,4 +292,43 @@ func (g *Group) RemoteUpdateCache() (empty bool, err error) {
 	}
 	fmt.Printf("request update cache succeed, key: %s, value: %s\n", key, value)
 	return
+}
+
+func (g *Group) SendTimeoutCache(num int) {
+	keys := make([]string, 0)
+
+	g.mainCache.mu.Lock()
+	if g.mainCache.lru == nil {
+		g.mainCache.lru = New(g.mainCache.cacheBytes, nil)
+	}
+
+	ele := g.mainCache.lru.ll.Front()
+	for {
+		if ele == nil {
+			break
+		}
+		kv := ele.Value.(*entry)
+		// Only update caches that have timed out
+		if int(time.Now().Sub(kv.timestamp).Minutes()) >= ExpireMinutes {
+			keys = append(keys, kv.key)
+		}
+		if ele == g.mainCache.lru.ll.Back() {
+			break
+		}
+		if len(keys) == num {
+			break
+		}
+		ele = ele.Next()
+	}
+	g.mainCache.mu.Unlock()
+
+	var succeed int
+	for _, key := range keys {
+		select {
+		case g.mainCache.missedChan <- key:
+			succeed++
+		default:
+		}
+	}
+	fmt.Printf("send timeout cache done, total: %d, succeed: %d\n", len(keys), succeed)
 }
