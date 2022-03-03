@@ -49,7 +49,7 @@ func main() {
 		}
 	}()
 
-	addr := "0.0.0.0:7295"
+	addr := "0.0.0.0:7296"
 	peers := cache.NewHTTPPool(addr)
 	log.Println("server is running at", addr)
 	log.Fatal(http.ListenAndServe(addr, peers))

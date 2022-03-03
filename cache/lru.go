@@ -80,16 +80,8 @@ func (c *Cache) Get(key string) (value Value, ok bool) {
 		c.ll.MoveToFront(ele)
 		if int(time.Now().Sub(ele.Value.(*entry).timestamp).Minutes()) >= ExpireMinutes {
 			fmt.Printf("cache timeout, key: %s\n", key)
-			go func() {
-				g := GetGroup(Sina)
-				if g.mainCache.missedChan == nil {
-					g.mainCache.missedChan = make(chan string, MissedChanLen)
-				}
-				select {
-				case g.mainCache.missedChan <- key:
-				default:
-				}
-			}()
+			g := GetGroup(Sina)
+			g.SendMissedCache(key)
 		}
 		return ele.Value.(*entry).value, true
 	}

@@ -168,13 +168,7 @@ func (g *Group) getLocally(key string) (ByteView, error) {
 	//g.populateCache(key, value)
 	//return value, nil
 
-	if g.mainCache.missedChan == nil {
-		g.mainCache.missedChan = make(chan string, MissedChanLen)
-	}
-	select {
-	case g.mainCache.missedChan <- key:
-	default:
-	}
+	g.SendMissedCache(key)
 	return ByteView{}, errors.New("no data")
 }
 
@@ -343,4 +337,14 @@ func (g *Group) SendTimeoutCache(num int) {
 		}
 	}
 	fmt.Printf("send timeout cache done, total: %d, succeed: %d\n", len(keys), succeed)
+}
+
+func (g *Group) SendMissedCache(key string) {
+	if g.mainCache.missedChan == nil {
+		g.mainCache.missedChan = make(chan string, MissedChanLen)
+	}
+	select {
+	case g.mainCache.missedChan <- key:
+	default:
+	}
 }
