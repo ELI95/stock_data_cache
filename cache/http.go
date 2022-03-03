@@ -12,7 +12,7 @@ const defaultBasePath = "/cache/"
 const Sina = "sina"
 
 type UpdateCacheRequest struct {
-	Key string `json:"key"`
+	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
@@ -63,7 +63,7 @@ func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// get missed
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		select {
-		case key := <- group.mainCache.missedChan:
+		case key := <-group.mainCache.missedChan:
 			fmt.Printf("missed channel length: %d\n", len(group.mainCache.missedChan))
 			_, err := w.Write([]byte(key))
 			if err != nil {

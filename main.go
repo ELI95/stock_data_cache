@@ -26,7 +26,7 @@ func main() {
 	go func() {
 		for {
 			select {
-			case <- time.After(time.Hour):
+			case <-time.After(time.Hour):
 				g.SaveCache()
 			}
 		}
@@ -34,17 +34,17 @@ func main() {
 	go func() {
 		for {
 			select {
-			case <- time.After(time.Minute * 10):
+			case <-time.After(time.Minute * 10):
 				g.SendTimeoutCache(100)
 			}
 		}
 	}()
 	go func() {
 		for {
-			<- time.After(time.Second)
+			<-time.After(time.Second)
 			empty, _ := g.RemoteUpdateCache()
 			if empty {
-				<- time.After(time.Second * 10)
+				<-time.After(time.Second * 10)
 			}
 		}
 	}()

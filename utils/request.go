@@ -77,7 +77,7 @@ func DoGetRequest(url string, timeout time.Duration, opts ...RequestOption) (b [
 	return
 }
 
-func DoPostRequest(url string, timeout time.Duration, body io.Reader, opts ...RequestOption,) (b []byte, err error) {
+func DoPostRequest(url string, timeout time.Duration, body io.Reader, opts ...RequestOption) (b []byte, err error) {
 	defer TimeTrack(time.Now(), "DoPostRequest")
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
