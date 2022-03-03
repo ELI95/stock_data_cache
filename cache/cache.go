@@ -215,7 +215,7 @@ func (g *Group) UpdateCache(num, minutes int) {
 	var succeed int
 	for _, key := range keys {
 		time.Sleep(time.Millisecond * 100)
-		v, err := RequestSina(key)
+		v, err := RequestSina(key, time.Second*5)
 		if err != nil {
 			fmt.Printf("request sina failed, error: %s\n", err.Error())
 			continue
@@ -275,18 +275,20 @@ func (g *Group) LoadCache() {
 }
 
 func (g *Group) RemoteUpdateCache() (empty bool, err error) {
-	key, err := DoGetRequest(MissedCacheApi)
+	b, err := utils.DoGetRequest(MissedCacheApi, time.Second*5)
 	if err != nil {
 		fmt.Printf("request get missed failed, error: %s\n", err.Error())
 		return
 	}
+
+	key := string(b)
 	if key == "" {
 		fmt.Println("no missed")
 		empty = true
 		return
 	}
 
-	value, err := RequestSina(key)
+	value, err := RequestSina(key, time.Second*5)
 	if err != nil {
 		fmt.Printf("request sina failed, error: %s\n", err.Error())
 		return
@@ -296,8 +298,8 @@ func (g *Group) RemoteUpdateCache() (empty bool, err error) {
 		Key:   key,
 		Value: value,
 	}
-	b, _ := json.Marshal(req)
-	if _, err = DoPostRequest(UpdateCacheApi, bytes.NewBuffer(b)); err != nil {
+	b, _ = json.Marshal(req)
+	if _, err = utils.DoPostRequest(UpdateCacheApi, time.Second*5, bytes.NewBuffer(b)); err != nil {
 		fmt.Printf("request update cache failed, error: %s\n", err.Error())
 	}
 	fmt.Printf("request update cache succeed, key: %s, value: %s\n", key, value)

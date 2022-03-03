@@ -13,7 +13,7 @@ func main() {
 	cache.NewGroup(cache.Sina, 2<<26, cache.GetterFunc(
 		func(key string) ([]byte, error) {
 			log.Println("request sina", key)
-			v, err := cache.RequestSina(key)
+			v, err := cache.RequestSina(key, time.Second*5)
 			if err != nil {
 				msg := fmt.Sprintf("request sina failed, error: %s", err.Error())
 				fmt.Println(msg)
