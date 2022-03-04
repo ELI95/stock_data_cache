@@ -2,7 +2,7 @@
 
 #### 访问方式
 ```
-curl http://localhost:7295/cache/sina?key=https://hq.sinajs.cn/list=sz000001
+curl http://localhost:7295/cache/sina?key=http://hq.sinajs.cn/list=sz000001
 ```
 
 #### 流程
